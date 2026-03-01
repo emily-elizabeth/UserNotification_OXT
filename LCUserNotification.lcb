@@ -1,0 +1,142 @@
+library org.openxtalk.usernotification
+
+use com.livecode.foreign
+use com.livecode.objc
+
+metadata version is "1.0.0"
+metadata author is "Emily-Elizabeth Howard"
+metadata title is "User Notification Library"
+metadata platforms is "mac"
+
+
+--------------------- foreign handlers
+
+-- UNUserNotificationCenter API (macOS 10.14+)
+private foreign handler UNUserNotificationCenterCurrentNotificationCenter() returns ObjcId binds to "objc:UNUserNotificationCenter.+currentNotificationCenter"
+private foreign handler UNMutableNotificationContentAlloc() returns ObjcRetainedId binds to "objc:UNMutableNotificationContent.+alloc"
+private foreign handler UNMutableNotificationContentInit(in AnInstance as ObjcId) returns ObjcId binds to "objc:UNMutableNotificationContent.-init"
+private foreign handler UNMutableNotificationContentSetProperty(in Obj as ObjcId, in PValue as ObjcId, in PProp as ObjcId) returns nothing binds to "objc:UNMutableNotificationContent.-setValue:forKey:"
+private foreign handler UNTimeIntervalNotificationTriggerWithTimeInterval(in TimeInterval as CDouble, in Repeats as CBool) returns ObjcId binds to "objc:UNTimeIntervalNotificationTrigger.+triggerWithTimeInterval:repeats:"
+private foreign handler UNNotificationRequestAllocWithIdentifier(in Identifier as ObjcId, in Content as ObjcId, in Trigger as ObjcId) returns ObjcId binds to "objc:UNNotificationRequest.+requestWithIdentifier:content:trigger:"
+private foreign handler UNUserNotificationCenterAddNotificationRequest(in Center as ObjcId, in Request as ObjcId, in CompletionHandler as optional ObjcBlockPointer) returns nothing binds to "objc:UNUserNotificationCenter.-addNotificationRequest:withCompletionHandler:"
+private foreign handler UNUserNotificationCenterRequestAuthorization(in Center as ObjcId, in Options as CSInt, in CompletionHandler as optional ObjcBlockPointer) returns nothing binds to "objc:UNUserNotificationCenter.-requestAuthorizationWithOptions:completionHandler:"
+
+-- Fallback to NSUserNotificationCenter for older macOS versions
+private foreign handler NSUserNotificationCenterDefaultUserNotificationCenter() returns ObjcId binds to "objc:NSUserNotificationCenter.+defaultUserNotificationCenter"
+private foreign handler NSUserNotificationAlloc() returns ObjcRetainedId binds to "objc:NSUserNotification.+alloc"
+private foreign handler NSUserNotificationInit(in AnInstance as ObjcId) returns ObjcId binds to "objc:NSUserNotification.-init"
+private foreign handler NSUserNotificationSetProperty(in Obj as ObjcId, in PValue as ObjcId, in PProp as ObjcId) returns nothing binds to "objc:NSUserNotification.-setValue:forKey:"
+private foreign handler NSUserNotificationCenterDeliverNotification(in DefaultUserNotificationCenter as ObjcId, in ANSUserNotification as ObjcId) returns nothing binds to "objc:NSUserNotificationCenter.-deliverNotification:"
+
+private foreign handler NSDistributedNotificationCenterDefaultCenter() returns ObjcId binds to "objc:NSDistributedNotificationCenter.+defaultCenter"
+private foreign handler NSDistributedNotificationCenterPostNotificationNameObject(in DefaultCenter as ObjcId, in NotificationName as ObjcId, in NotificationObject as ObjcId) returns nothing binds to "objc:NSDistributedNotificationCenter.-postNotificationName:object:"
+
+
+
+--------------------- Block handlers
+
+-- Block type and handler for addNotificationRequest completion: ^(NSError *error)
+public handler type AddNotificationCompletionBlock(in pContext as ObjcBlockPointer, in pError as optional ObjcId) returns nothing
+public handler AddNotificationCompletion(in pContext as ObjcBlockPointer, in pError as optional ObjcId) returns nothing
+	-- no-op: we don't need to handle the completion
+end handler
+
+-- Block type and handler for requestAuthorization completion: ^(BOOL granted, NSError *error)
+public handler type AuthorizationCompletionBlock(in pContext as ObjcBlockPointer, in pGranted as CBool, in pError as optional ObjcId) returns nothing
+public handler AuthorizationCompletion(in pContext as ObjcBlockPointer, in pGranted as CBool, in pError as optional ObjcId) returns nothing
+	-- no-op
+end handler
+
+-- Module-level variables to keep blocks retained
+private variable sAddNotificationBlock as optional ObjcBlockPointer
+private variable sAuthorizationBlock as optional ObjcBlockPointer
+
+
+
+--------------------- Public handlers
+
+public unsafe handler RequestNotificationAuthorization() returns nothing
+	if (the operating system is "mac") then
+		variable NotificationCenter as ObjcId
+		put UNUserNotificationCenterCurrentNotificationCenter() into NotificationCenter
+		if (NotificationCenter is not nothing) then
+			CreateObjcBlockPointerFromHandler(AuthorizationCompletion, sAuthorizationBlock)
+			-- Request alert=4, sound=2, badge=1
+			UNUserNotificationCenterRequestAuthorization(NotificationCenter, 7, sAuthorizationBlock)
+		end if
+	end if
+end handler
+
+
+
+public unsafe handler PostUserNotification(in postTitle as String, in subTitle as String, in informativeText as optional String, in postIdentifier as optional String) returns nothing
+	if (the operating system is "mac") then
+		variable NotificationCenter as ObjcId
+		put UNUserNotificationCenterCurrentNotificationCenter() into NotificationCenter
+
+		if (NotificationCenter is not nothing) then
+			-- Create mutable notification content
+			variable Content as ObjcObject
+			put UNMutableNotificationContentAlloc() into Content
+			put UNMutableNotificationContentInit(Content) into Content
+
+			-- Set notification properties
+			UNMutableNotificationContentSetProperty(Content, StringToNSString(postTitle), StringToNSString("title"))
+
+			if (subTitle is not nothing) then
+				UNMutableNotificationContentSetProperty(Content, StringToNSString(subTitle), StringToNSString("subtitle"))
+			end if
+
+			if (informativeText is not nothing) then
+				UNMutableNotificationContentSetProperty(Content, StringToNSString(informativeText), StringToNSString("body"))
+			end if
+
+			-- Create trigger (deliver after 1 second)
+			variable Trigger as ObjcId
+			put UNTimeIntervalNotificationTriggerWithTimeInterval(1.0, false) into Trigger
+
+			-- Create notification request with identifier
+			variable Identifier as String
+			if (postIdentifier is not nothing) then
+				put postIdentifier into Identifier
+			else
+				put "org.openxtalk.notification" into Identifier
+			end if
+
+			variable Request as ObjcId
+			put UNNotificationRequestAllocWithIdentifier(StringToNSString(Identifier), Content, Trigger) into Request
+
+			-- Pass a real block (not nothing) to ensure delivery
+			CreateObjcBlockPointerFromHandler(AddNotificationCompletion, sAddNotificationBlock)
+			UNUserNotificationCenterAddNotificationRequest(NotificationCenter, Request, sAddNotificationBlock)
+		end if
+	end if
+end handler
+
+
+
+private unsafe handler PostUserNotificationLegacy(in postTitle as String, in subTitle as String, in informativeText as optional String, in postIdentifier as optional String) returns nothing
+	variable DefaultUserNotificationCenter as ObjcId
+	put NSUserNotificationCenterDefaultUserNotificationCenter() into DefaultUserNotificationCenter
+
+	variable ANSUserNotification as ObjcObject
+	put NSUserNotificationAlloc() into ANSUserNotification
+	put NSUserNotificationInit(ANSUserNotification) into ANSUserNotification
+
+	NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(postTitle), StringToNSString("title"))
+	if (subTitle is not nothing) then
+		NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(subTitle), StringToNSString("subtitle"))
+	end if
+	if (informativeText is not nothing) then
+		NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(informativeText), StringToNSString("informativeText"))
+	end if
+	if (postIdentifier is not nothing) then
+		NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(postIdentifier), StringToNSString("identifier"))
+	end if
+
+	NSUserNotificationCenterDeliverNotification(DefaultUserNotificationCenter, ANSUserNotification)
+end handler
+
+
+
+end library
