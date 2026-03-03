@@ -1,18 +1,21 @@
 import module org.openxtalk.unusernotification
   use com.livecode.objc
   use com.livecode.foreign
+  use com.livecode.engine
   use com.livecode.arithmetic
   use com.livecode.binary
   use com.livecode.list
   use com.livecode.logic
   use com.livecode.string
   use com.livecode.type
-  use com.livecode.engine
   use com.livecode.system
   handler type AddNotificationCompletionBlock(in pContext as Pointer, in pError as optional ObjcId) returns nothing
   handler AddNotificationCompletion(in pContext as Pointer, in pError as optional ObjcId) returns nothing
   handler type AuthorizationCompletionBlock(in pContext as Pointer, in pGranted as CBool, in pError as optional ObjcId) returns nothing
   handler AuthorizationCompletion(in pContext as Pointer, in pGranted as CBool, in pError as optional ObjcId) returns nothing
+  handler type GetNotificationSettingsCompletionBlock(in pContext as Pointer, in pSettings as ObjcId) returns nothing
+  handler GetNotificationSettingsCompletion(in pContext as Pointer, in pSettings as ObjcId) returns nothing
   unsafe handler RequestNotificationAuthorization() returns nothing
+  unsafe handler CheckNotificationAuthorizationStatus() returns nothing
   unsafe handler PostUserNotification(in postTitle as String, in subTitle as String, in informativeText as optional String, in postIdentifier as optional String) returns nothing
 end module
