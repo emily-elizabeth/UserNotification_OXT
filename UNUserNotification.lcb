@@ -1,4 +1,4 @@
-library org.openxtalk.usernotification
+library org.openxtalk.unusernotification
 
 use com.livecode.foreign
 use com.livecode.objc
@@ -45,20 +45,7 @@ private foreign handler UNUserNotificationCenterAddNotificationRequest(in Center
 -- The completion block fires asynchronously once the user responds to the permission dialog.
 private foreign handler UNUserNotificationCenterRequestAuthorization(in Center as ObjcId, in Options as CSInt, in CompletionHandler as optional ObjcBlockPointer) returns nothing binds to "objc:UserNotifications.framework>UNUserNotificationCenter.-requestAuthorizationWithOptions:completionHandler:"
 
-
--- NSUserNotificationCenter is the legacy notification API, deprecated in macOS 10.14
--- and no longer functional on newer macOS versions. Kept here for reference only.
-
-private foreign handler NSUserNotificationCenterDefaultUserNotificationCenter() returns ObjcId binds to "objc:NSUserNotificationCenter.+defaultUserNotificationCenter"
-private foreign handler NSUserNotificationAlloc() returns ObjcRetainedId binds to "objc:NSUserNotification.+alloc"
-private foreign handler NSUserNotificationInit(in AnInstance as ObjcId) returns ObjcId binds to "objc:NSUserNotification.-init"
-private foreign handler NSUserNotificationSetProperty(in Obj as ObjcId, in PValue as ObjcId, in PProp as ObjcId) returns nothing binds to "objc:NSUserNotification.-setValue:forKey:"
-private foreign handler NSUserNotificationCenterDeliverNotification(in DefaultUserNotificationCenter as ObjcId, in ANSUserNotification as ObjcId) returns nothing binds to "objc:NSUserNotificationCenter.-deliverNotification:"
-
--- NSDistributedNotificationCenter is declared here but unused. It is a system-wide
--- notification bus for broadcasting messages between processes on the same machine.
-private foreign handler NSDistributedNotificationCenterDefaultCenter() returns ObjcId binds to "objc:NSDistributedNotificationCenter.+defaultCenter"
-private foreign handler NSDistributedNotificationCenterPostNotificationNameObject(in DefaultCenter as ObjcId, in NotificationName as ObjcId, in NotificationObject as ObjcId) returns nothing binds to "objc:NSDistributedNotificationCenter.-postNotificationName:object:"
+private foreign handler NSErrorLocalizedDescription(in Error as ObjcId) returns ObjcId binds to "objc:NSError.-localizedDescription"
 
 
 
@@ -99,8 +86,6 @@ public handler AuthorizationCompletion(in pContext as ObjcBlockPointer, in pGran
 		end unsafe
 	end if
 end handler
-
-private foreign handler NSErrorLocalizedDescription(in Error as ObjcId) returns ObjcId binds to "objc:NSError.-localizedDescription"
 
 -- Module-level variables hold the block pointers, keeping them retained for the
 -- duration of the async callbacks.
@@ -172,7 +157,7 @@ public unsafe handler PostUserNotification(in postTitle as String, in subTitle a
 			if (postIdentifier is not nothing) then
 				put postIdentifier into Identifier
 			else
-				put "com.freelibs.notification" into Identifier
+				put "org.openxtalk.notification" into Identifier
 			end if
 
 			-- Combine content, trigger, and identifier into a request object
@@ -185,34 +170,6 @@ public unsafe handler PostUserNotification(in postTitle as String, in subTitle a
 			UNUserNotificationCenterAddNotificationRequest(NotificationCenter, Request, sAddNotificationBlock)
 		end if
 	end if
-end handler
-
-
-
--- PostUserNotificationLegacy
--- Legacy implementation using the deprecated NSUserNotificationCenter API.
--- This API was deprecated in macOS 10.14 and is non-functional on newer macOS versions.
--- Retained here for reference but no longer called by PostUserNotification.
-private unsafe handler PostUserNotificationLegacy(in postTitle as String, in subTitle as String, in informativeText as optional String, in postIdentifier as optional String) returns nothing
-	variable DefaultUserNotificationCenter as ObjcId
-	put NSUserNotificationCenterDefaultUserNotificationCenter() into DefaultUserNotificationCenter
-
-	variable ANSUserNotification as ObjcObject
-	put NSUserNotificationAlloc() into ANSUserNotification
-	put NSUserNotificationInit(ANSUserNotification) into ANSUserNotification
-
-	NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(postTitle), StringToNSString("title"))
-	if (subTitle is not nothing) then
-		NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(subTitle), StringToNSString("subtitle"))
-	end if
-	if (informativeText is not nothing) then
-		NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(informativeText), StringToNSString("informativeText"))
-	end if
-	if (postIdentifier is not nothing) then
-		NSUserNotificationSetProperty(ANSUserNotification, StringToNSString(postIdentifier), StringToNSString("identifier"))
-	end if
-
-	NSUserNotificationCenterDeliverNotification(DefaultUserNotificationCenter, ANSUserNotification)
 end handler
 
 

@@ -1,4 +1,4 @@
-import module org.openxtalk.usernotification
+import module org.openxtalk.unusernotification
   use com.livecode.objc
   use com.livecode.foreign
   use com.livecode.arithmetic
