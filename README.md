@@ -35,7 +35,33 @@ end openStack
 
 On first run, macOS will show a system permission dialog. On subsequent runs the cached decision is used and no dialog is shown.
 
-### 2. Post a notification
+### 2. Check authorization status
+
+Use `CheckNotificationAuthorizationStatus` to query the current authorization status without showing a permission dialog. The result is returned asynchronously as a `notificationAuthorizationStatus` message sent to the current stack.
+
+```livecode
+on mouseUp
+   CheckNotificationAuthorizationStatus
+end mouseUp
+
+on notificationAuthorizationStatus pStatus
+   switch pStatus
+      case "authorized"
+         PostUserNotification "Hello", "", "", ""
+         break
+      case "denied"
+         answer "Please enable notifications in System Settings → Notifications."
+         break
+      case "notDetermined"
+         RequestNotificationAuthorization
+         break
+      default
+         put pStatus into field "statusField"
+   end switch
+end notificationAuthorizationStatus
+```
+
+### 3. Post a notification
 
 ```livecode
 PostUserNotification "Backup Complete", "Your files have been saved", "3 files backed up to /Volumes/Backup", "com.myapp.backup"
@@ -66,6 +92,56 @@ This command has no effect on non-Mac platforms.
 **Example:**
 ```livecode
 RequestNotificationAuthorization
+```
+
+---
+
+### `CheckNotificationAuthorizationStatus`
+
+**Type:** command
+
+**Syntax:** `CheckNotificationAuthorizationStatus`
+
+**Summary:** Asynchronously checks the current notification authorization status for this app.
+
+**Description:**
+
+Use `CheckNotificationAuthorizationStatus` to query whether the app currently has permission to display notifications, without triggering a permission dialog. This is useful for checking status before posting a notification, or for directing the user to System Settings if permission has been denied.
+
+The result is delivered asynchronously as a `notificationAuthorizationStatus` message sent to the current stack, with a single parameter `pStatus` containing one of the following strings:
+
+| Status | Description |
+|---|---|
+| `"authorized"` | Full notification permission has been granted. |
+| `"denied"` | The user has denied permission. Direct them to System Settings → Notifications to re-enable. |
+| `"notDetermined"` | Permission has never been requested. Call `RequestNotificationAuthorization`. |
+| `"provisional"` | Quiet/non-interrupting delivery granted (macOS 12 and later). |
+| `"ephemeral"` | Short-session grant, e.g. App Clips (macOS 11 and later). |
+| `"unknown"` | A status value not recognised by this version of the library. |
+
+This command has no effect on non-Mac platforms.
+
+**Example:**
+```livecode
+on mouseUp
+   CheckNotificationAuthorizationStatus
+end mouseUp
+
+on notificationAuthorizationStatus pStatus
+   switch pStatus
+      case "authorized"
+         PostUserNotification "Hello", "", "", ""
+         break
+      case "denied"
+         answer "Please enable notifications in System Settings → Notifications."
+         break
+      case "notDetermined"
+         RequestNotificationAuthorization
+         break
+      default
+         put pStatus into field "statusField"
+   end switch
+end notificationAuthorizationStatus
 ```
 
 ---
@@ -112,4 +188,3 @@ PostUserNotification "Hello", "", "", ""
 - Notifications posted while the app is in the **foreground** are suppressed by macOS unless a `UNUserNotificationCenterDelegate` is set. This is a known limitation of the current version.
 - The minimum trigger interval allowed by `UNTimeIntervalNotificationTrigger` is 1 second, so all notifications are delivered with a short delay.
 - If the same `pIdentifier` is reused, the pending notification is replaced. To guarantee stacking, append `the milliseconds` to your identifier string.
-
