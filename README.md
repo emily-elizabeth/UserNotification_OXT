@@ -1,6 +1,6 @@
 # UNUserNotification
 
-A LiveCode Builder extension for posting local notifications on macOS 10.14 and later using the modern `UNUserNotificationCenter` API.
+A LiveCode Builder extension for posting local notifications on macOS 10.14 and later using the modern `UNUserNotificationCenter` API. Current version: 1.0.1.
 
 ---
 
@@ -37,7 +37,7 @@ On first run, macOS will show a system permission dialog. On subsequent runs the
 
 ### 2. Check authorization status
 
-Use `CheckNotificationAuthorizationStatus` to query the current authorization status without showing a permission dialog. The result is returned asynchronously as a `notificationAuthorizationStatus` message sent to the current stack.
+Use `CheckNotificationAuthorizationStatus` to query the current authorization status without showing a permission dialog. The result is delivered asynchronously as a `notificationAuthorizationStatus` message posted to the script object that called this command. Repeated calls while a request is already in flight are safely ignored until the callback fires.
 
 ```livecode
 on mouseUp
@@ -108,7 +108,7 @@ RequestNotificationAuthorization
 
 Use `CheckNotificationAuthorizationStatus` to query whether the app currently has permission to display notifications, without triggering a permission dialog. This is useful for checking status before posting a notification, or for directing the user to System Settings if permission has been denied.
 
-The result is delivered asynchronously as a `notificationAuthorizationStatus` message sent to the current stack, with a single parameter `pStatus` containing one of the following strings:
+The result is delivered asynchronously as a `notificationAuthorizationStatus` message posted to the script object that called this command, with a single parameter `pStatus` containing one of the following strings:
 
 | Status | Description |
 |---|---|
@@ -118,6 +118,8 @@ The result is delivered asynchronously as a `notificationAuthorizationStatus` me
 | `"provisional"` | Quiet/non-interrupting delivery granted (macOS 12 and later). |
 | `"ephemeral"` | Short-session grant, e.g. App Clips (macOS 11 and later). |
 | `"unknown"` | A status value not recognised by this version of the library. |
+
+Calling this command a second time before the first callback has fired is safe — subsequent calls are ignored until the in-flight request completes.
 
 This command has no effect on non-Mac platforms.
 
